@@ -1,12 +1,69 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>LocalStorage Debug Tool</title>
 </head>
 <body>
-    lennox ist gay
-    <p>und felix fickt mit ihm</p>
+
+    <h3>LocalStorage Debug Tool</h3>
+
+    <input type="text" class="keyInput" placeholder="Key">
+    <input type="text" class="valueInput" placeholder="Value">
+
+    <button onclick="save()">Speichern / Überschreiben</button>
+
+    <hr>
+
+    <input type="text" class="getKey" placeholder="Key zum Abrufen">
+    <button onclick="load()">Abrufen</button>
+    <button onclick="removeKey()">Löschen</button>
+
+    <pre class="output"></pre>
+
+    <script>
+        function save() {
+            const key = document.querySelector('.keyInput').value;
+            const value = document.querySelector('.valueInput').value;
+
+            if (!key) {
+                show('Kein Key angegeben');
+                return;
+            }
+
+            localStorage.setItem(key, value);
+            show('Gespeichert: ' + key);
+        }
+
+        function load() {
+            const key = document.querySelector('.getKey').value;
+            const raw = localStorage.getItem(key);
+
+            if (raw === null) {
+                show('Nichts gefunden');
+                return;
+            }
+
+            let output = raw;
+
+            try {
+                output = JSON.stringify(JSON.parse(raw), null, 2);
+            } catch (e) {}
+
+            show(output);
+        }
+
+        function removeKey() {
+            const key = document.querySelector('.getKey').value;
+            localStorage.removeItem(key);
+            show('Gelöscht: ' + key);
+        }
+
+        function show(text) {
+            document.querySelector('.output').textContent = text;
+        }
+    </script>
+
 </body>
 </html>
