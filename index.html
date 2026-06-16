@@ -1,1161 +1,747 @@
-
 <!DOCTYPE html>
 <html lang="de">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Notenmanager</title>
-
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-
+<title>Mein Fotoalbum</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --bg: #0f0f13;
-    --surface: #16161e;
-    --surface2: #1e1e2a;
-    --surface3: #252533;
-    --border: rgba(255,255,255,0.07);
-    --border2: rgba(255,255,255,0.12);
-    --text: #f0f0f5;
-    --text2: #9898aa;
-    --text3: #5c5c70;
-    --accent: #7c6ff7;
-    --accent2: #5b54d6;
-    --accent-dim: rgba(124,111,247,0.15);
-    --lk: #3b82f6;
-    --lk-dim: rgba(59,130,246,0.15);
-    --gk: #6b7280;
-    --gk-dim: rgba(107,114,128,0.12);
-    --green: #10b981;
-    --green-dim: rgba(16,185,129,0.12);
-    --red: #ef4444;
-    --red-dim: rgba(239,68,68,0.12);
-    --amber: #f59e0b;
-    --radius: 12px;
-    --radius-sm: 8px;
-    --radius-xs: 6px;
+  :root{
+    --kraft: #ECE0C4;
+    --kraft-dark: #D8C9A0;
+    --cork: #A9835A;
+    --cork-shadow: #7C5C39;
+    --ink: #3A2E26;
+    --ink-soft: #6B5C4D;
+    --paper-white: #FFFDF7;
+    --terracotta: #C1714D;
+    --sage: #8A9B6E;
+    --mustard: #D9A441;
+    --dustyblue: #6E8AA8;
+    --stamp-orange: #FF6A3D;
+    --font-display: 'Caveat', cursive;
+    --font-body: 'Libre Baskerville', Georgia, serif;
+    --font-mono: 'Space Mono', monospace;
   }
 
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--text);
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family: var(--font-body);
+    color: var(--ink);
+    background: var(--kraft);
     min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
   }
 
-  /* ── LOADING SCREEN ── */
-  #loading-screen {
-    position: fixed; inset: 0;
-    background: var(--bg);
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 16px; z-index: 999;
-    transition: opacity 0.3s;
-  }
-  #loading-screen.hidden { opacity: 0; pointer-events: none; }
-  .spinner {
-    width: 36px; height: 36px;
-    border: 2px solid var(--surface3);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ── SETUP SCREEN ── */
-  #setup-screen {
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    padding: 24px;
-    width: 100%;
-    max-width: 480px;
-    gap: 0;
-  }
-  #setup-screen.visible { display: flex; }
-
-  /* ── CONFIG SCREEN ── */
-  #config-screen {
-    display: none;
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.7);
-    z-index: 100;
-    align-items: center; justify-content: center;
-    padding: 24px;
-  }
-  #config-screen.visible { display: flex; }
-
-  /* ── MAIN APP ── */
-  #app {
-    display: none;
-    flex-direction: column;
-    width: 100%;
-    max-width: 640px;
-    min-height: 100vh;
-    padding: 0 0 80px;
-  }
-  #app.visible { display: flex; }
-
-  /* ── TOP BAR ── */
-  .topbar {
-    position: sticky; top: 0; z-index: 50;
-    background: rgba(15,15,19,0.9);
-    backdrop-filter: blur(12px);
-    border-bottom: 0.5px solid var(--border);
-    padding: 14px 20px;
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .topbar-left { display: flex; align-items: center; gap: 10px; }
-  .topbar-logo {
-    font-size: 16px; font-weight: 600;
-    background: linear-gradient(135deg, #7c6ff7, #a78bfa);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    letter-spacing: -0.02em;
-  }
-  .klasse-chip {
-    background: var(--accent-dim); color: #a78bfa;
-    font-size: 12px; font-weight: 500;
-    padding: 3px 10px; border-radius: 20px;
-    border: 0.5px solid rgba(124,111,247,0.3);
+  button{
+    font-family: var(--font-body);
     cursor: pointer;
-    transition: background 0.15s;
   }
-  .klasse-chip:hover { background: rgba(124,111,247,0.25); }
 
-  /* ── ZEUGNIS CARD ── */
-  .zeugnis-section { padding: 20px 20px 0; }
-  .zeugnis-card {
-    background: linear-gradient(135deg, rgba(124,111,247,0.12) 0%, rgba(91,84,214,0.08) 100%);
-    border: 0.5px solid rgba(124,111,247,0.25);
-    border-radius: var(--radius);
-    padding: 18px 20px;
-    display: flex; align-items: center; justify-content: space-between;
+  /* Accessibility: focus visibility */
+  button:focus-visible,
+  [tabindex]:focus-visible,
+  input:focus-visible,
+  [contenteditable]:focus-visible{
+    outline: 2px solid var(--terracotta);
+    outline-offset: 3px;
   }
-  .zeugnis-label { font-size: 12px; color: var(--text2); margin-bottom: 4px; }
-  .zeugnis-note { font-size: 28px; font-weight: 700; color: #a78bfa; letter-spacing: -0.03em; }
-  .zeugnis-sub { font-size: 12px; color: var(--text3); margin-top: 2px; }
-  .zeugnis-right { text-align: right; }
-  .zeugnis-schnitt { font-size: 13px; color: var(--text2); }
-  .zeugnis-schnitt span { color: var(--text); font-weight: 500; }
 
-  /* ── SECTION ── */
-  .section { padding: 20px 20px 0; }
-  .section-header {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 12px;
+  @media (prefers-reduced-motion: reduce){
+    *{ transition: none !important; animation: none !important; }
   }
-  .section-title { font-size: 12px; font-weight: 500; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; }
 
-  /* ── BUTTONS ── */
-  .btn-icon {
-    width: 32px; height: 32px; border-radius: 50%;
-    background: var(--surface2); border: 0.5px solid var(--border2);
-    color: var(--text2); cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px; transition: all 0.15s;
+  .sr-only{
+    position:absolute; width:1px; height:1px;
+    padding:0; margin:-1px; overflow:hidden;
+    clip:rect(0,0,0,0); white-space:nowrap; border:0;
   }
-  .btn-icon:hover { background: var(--surface3); color: var(--text); }
-  .btn-icon:active { transform: scale(0.93); }
 
-  .btn-primary {
-    background: var(--accent); color: white;
-    border: none; border-radius: var(--radius-sm);
-    padding: 10px 18px; font-size: 14px; font-weight: 500;
-    cursor: pointer; transition: all 0.15s; width: 100%;
+  /* ---------- HEADER ---------- */
+  header{
+    background: var(--kraft);
+    text-align:center;
+    padding: 56px 20px 36px;
+    position:relative;
   }
-  .btn-primary:hover { background: var(--accent2); }
-  .btn-primary:active { transform: scale(0.98); }
+  header::after{
+    content:"";
+    position:absolute;
+    left:0; right:0; bottom:0;
+    height:14px;
+    background: repeating-linear-gradient(90deg, rgba(58,46,38,0.08) 0 2px, transparent 2px 16px);
+  }
+  header h1{
+    font-family: var(--font-display);
+    font-weight:700;
+    font-size: clamp(2.6rem, 6vw, 4.2rem);
+    margin: 0 0 6px;
+    color: var(--ink);
+    letter-spacing: 0.5px;
+    transform: rotate(-1deg);
+  }
+  header p{
+    font-style: italic;
+    color: var(--ink-soft);
+    margin:0;
+    font-size: 1.05rem;
+  }
 
-  .btn-ghost {
-    background: transparent; color: var(--text2);
-    border: 0.5px solid var(--border2); border-radius: var(--radius-sm);
-    padding: 10px 18px; font-size: 14px; cursor: pointer;
-    transition: all 0.15s; width: 100%;
+  main{
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 24px 0;
   }
-  .btn-ghost:hover { background: var(--surface2); color: var(--text); }
 
-  /* ── KURS CARDS ── */
-  .kurse-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-  .kurs-card {
-    background: var(--surface);
-    border: 0.5px solid var(--border);
-    border-radius: var(--radius);
-    padding: 14px;
-    cursor: pointer;
-    transition: all 0.15s;
+  /* ---------- UPLOAD ZONE ---------- */
+  .upload-zone{
+    margin: -18px auto 0;
+    max-width: 760px;
+    border: 2px dashed var(--ink-soft);
+    border-radius: 20px 26px 18px 24px;
+    background: var(--paper-white);
+    text-align:center;
+    padding: 38px 24px;
+    transition: background .2s ease, transform .2s ease, border-color .2s ease;
     position: relative;
-    overflow: hidden;
+    top: 28px;
   }
-  .kurs-card::before {
-    content: '';
-    position: absolute; top: 0; left: 0; right: 0; height: 2px;
-    background: var(--accent);
-    opacity: 0;
-    transition: opacity 0.15s;
+  .upload-zone.dragover{
+    background: #eef0e6;
+    border-color: var(--sage);
+    transform: scale(1.015);
   }
-  .kurs-card:hover { border-color: var(--border2); transform: translateY(-1px); }
-  .kurs-card:hover::before { opacity: 1; }
-  .kurs-card:active { transform: translateY(0); }
-  .kurs-name { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .kurs-footer { display: flex; align-items: center; gap: 6px; }
-  .badge {
-    font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px;
-    letter-spacing: 0.02em;
+  .upload-zone svg{
+    width: 46px; height:46px;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
   }
-  .badge-lk { background: var(--lk-dim); color: #60a5fa; border: 0.5px solid rgba(59,130,246,0.2); }
-  .badge-gk { background: var(--gk-dim); color: #9ca3af; border: 0.5px solid rgba(107,114,128,0.2); }
-  .kurs-note-big { margin-left: auto; font-size: 17px; font-weight: 700; color: var(--accent); }
-  .kurs-count { font-size: 11px; color: var(--text3); }
+  .upload-zone .upload-title{
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    font-weight:600;
+    color: var(--ink);
+    margin: 0 0 4px;
+  }
+  .upload-zone .upload-sub{
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    margin:0;
+  }
+  .upload-zone .browse-btn{
+    display:inline-block;
+    margin-top:14px;
+    background: var(--terracotta);
+    color: var(--paper-white);
+    border:none;
+    padding: 9px 22px;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: .3px;
+    transition: filter .15s ease, transform .15s ease;
+  }
+  .upload-zone .browse-btn:hover{ filter: brightness(1.08); transform: translateY(-1px); }
 
-  /* ── EMPTY STATE ── */
-  .empty-state {
-    text-align: center; padding: 40px 20px;
-    color: var(--text3); font-size: 13px;
-  }
-  .empty-icon { font-size: 32px; margin-bottom: 8px; opacity: 0.4; }
-
-  /* ── KURS DETAIL VIEW ── */
-  #detail-view {
-    display: none;
-    flex-direction: column;
-    width: 100%; max-width: 640px;
-    min-height: 100vh; padding: 0 0 80px;
-  }
-  #detail-view.visible { display: flex; }
-
-  .detail-topbar {
-    position: sticky; top: 0; z-index: 50;
-    background: rgba(15,15,19,0.9);
-    backdrop-filter: blur(12px);
-    border-bottom: 0.5px solid var(--border);
-    padding: 14px 20px;
-    display: flex; align-items: center; gap: 12px;
-  }
-  .back-btn {
-    background: var(--surface2); border: 0.5px solid var(--border2);
-    color: var(--text2); cursor: pointer; border-radius: var(--radius-xs);
-    padding: 6px 10px; font-size: 13px;
-    display: flex; align-items: center; gap: 4px;
-    transition: all 0.15s;
-  }
-  .back-btn:hover { background: var(--surface3); color: var(--text); }
-  .detail-title { font-size: 15px; font-weight: 600; flex: 1; }
-  .detail-badge { font-size: 11px; }
-
-  /* ── NOTE SUMMARY ── */
-  .note-summary {
-    margin: 20px;
-    background: var(--surface);
-    border: 0.5px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px 18px;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+  /* ---------- TOOLBAR ---------- */
+  .toolbar{
+    max-width: 760px;
+    margin: 60px auto 0;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
     gap: 12px;
+    flex-wrap: wrap;
+    color: var(--ink);
+    font-size: 0.9rem;
   }
-  .note-stat { text-align: center; }
-  .note-stat-val { font-size: 20px; font-weight: 700; color: var(--accent); }
-  .note-stat-label { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .toolbar .count{
+    font-style: italic;
+    color: var(--ink-soft);
+  }
+  .toolbar .actions{ display:flex; gap:10px; }
+  .toolbar button{
+    background: transparent;
+    border: 1.5px solid var(--ink-soft);
+    color: var(--ink);
+    padding: 7px 16px;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    transition: background .15s ease, color .15s ease;
+  }
+  .toolbar button:hover{ background: var(--ink); color: var(--paper-white); }
+  .toolbar .clear-btn:hover{ background: var(--terracotta); border-color: var(--terracotta); }
 
-  /* ── NOTEN LISTE ── */
-  .noten-list { padding: 0 20px; display: flex; flex-direction: column; gap: 8px; }
-  .noten-list-header {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 4px;
+  /* ---------- GALLERY / CORKBOARD ---------- */
+  .corkboard{
+    margin-top: 26px;
+    margin-bottom: 0;
+    background-color: var(--cork);
+    background-image:
+      radial-gradient(circle, rgba(0,0,0,0.10) 1px, transparent 1.4px),
+      radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1.4px);
+    background-size: 13px 13px, 9px 9px;
+    background-position: 0 0, 4px 5px;
+    box-shadow: inset 0 0 70px rgba(40,28,16,0.35);
+    border-radius: 6px;
+    padding: 50px clamp(20px, 5vw, 60px) 60px;
   }
-  .note-item {
-    background: var(--surface);
-    border: 0.5px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 12px 14px;
-    display: flex; align-items: center; gap: 12px;
+
+  .gallery{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 46px 28px;
   }
-  .note-punkt-circle {
-    width: 38px; height: 38px;
+
+  .gallery.gallery--empty{
+    display:flex;
+    justify-content:center;
+  }
+
+  .empty-state{
+    text-align:center;
+    color: var(--kraft);
+    max-width: 380px;
+    padding: 30px 10px;
+  }
+  .empty-state svg{
+    width: 70px; height:70px;
+    color: rgba(236,224,196,0.55);
+    margin-bottom: 6px;
+  }
+  .empty-state h2{
+    font-family: var(--font-display);
+    font-size: 2rem;
+    margin: 6px 0 6px;
+    color: var(--kraft);
+  }
+  .empty-state p{
+    font-size: 0.92rem;
+    color: rgba(236,224,196,0.8);
+    margin:0;
+  }
+
+  /* ---------- POLAROID ---------- */
+  .polaroid{
+    --rot: 0deg;
+    position:relative;
+    background: var(--paper-white);
+    padding: 14px 14px 12px;
+    border-radius: 3px;
+    box-shadow: 0 10px 18px rgba(30,20,10,0.35), 0 2px 4px rgba(30,20,10,0.25);
+    transform: rotate(var(--rot));
+    transition: transform .25s ease, box-shadow .25s ease, z-index 0s;
+    z-index: 1;
+  }
+  .polaroid:hover, .polaroid:focus-within{
+    transform: rotate(0deg) translateY(-6px) scale(1.045);
+    box-shadow: 0 18px 30px rgba(20,12,6,0.45);
+    z-index: 5;
+  }
+
+  .tape{
+    position:absolute;
+    top: -14px;
+    left: 50%;
+    width: 76px;
+    height: 28px;
+    transform: translateX(-50%) rotate(var(--tape-rot, -4deg));
+    opacity: 0.88;
+    box-shadow: 0 2px 3px rgba(0,0,0,0.25);
+  }
+  .tape::before{
+    content:"";
+    position:absolute; inset:0;
+    background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.18) 0 4px, transparent 4px 9px);
+  }
+  .tape-terracotta{ background: var(--terracotta); }
+  .tape-sage{ background: var(--sage); }
+  .tape-mustard{ background: var(--mustard); }
+  .tape-blue{ background: var(--dustyblue); }
+
+  .photo-frame{
+    position:relative;
+    width:100%;
+    aspect-ratio: 1 / 1;
+    overflow:hidden;
+    background: var(--kraft-dark);
+    cursor: zoom-in;
+    border-radius: 1px;
+  }
+  .photo-frame img{
+    width:100%; height:100%;
+    object-fit: cover;
+    display:block;
+  }
+
+  .stamp{
+    position:absolute;
+    right: 8px;
+    bottom: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--stamp-orange);
+    background: rgba(0,0,0,0.0);
+    text-shadow: 0 0 3px rgba(255,106,61,0.65), 0 1px 1px rgba(0,0,0,0.4);
+    letter-spacing: 0.5px;
+    pointer-events:none;
+  }
+
+  .caption{
+    font-family: var(--font-body);
+    font-style: italic;
+    font-size: 0.92rem;
+    color: var(--ink-soft);
+    text-align:center;
+    margin-top: 12px;
+    padding: 2px 4px;
+    min-height: 1.4em;
+    outline: none;
+    border-radius: 3px;
+  }
+  .caption:empty::before{
+    content: attr(data-placeholder);
+    color: var(--ink-soft);
+    opacity: 0.5;
+  }
+  .caption:focus{ background: rgba(0,0,0,0.04); }
+
+  .delete-btn{
+    position:absolute;
+    top: -10px;
+    right: -10px;
+    width: 28px; height:28px;
     border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 14px; font-weight: 700;
-    flex-shrink: 0;
+    background: var(--terracotta);
+    color: var(--paper-white);
+    border: 2px solid var(--paper-white);
+    font-size: 16px;
+    line-height: 1;
+    display:flex; align-items:center; justify-content:center;
+    opacity: 0;
+    transform: scale(0.85);
+    transition: opacity .15s ease, transform .15s ease, background .15s ease;
+    z-index: 6;
   }
-  .note-info { flex: 1; min-width: 0; }
-  .note-art { font-size: 13px; font-weight: 500; color: var(--text); }
-  .note-datum { font-size: 11px; color: var(--text3); margin-top: 1px; }
-  .note-gewicht { font-size: 11px; color: var(--text2); }
-  .note-actions { display: flex; gap: 6px; }
-  .note-del-btn {
-    background: transparent; border: none; color: var(--text3);
-    cursor: pointer; padding: 4px; border-radius: 4px;
-    font-size: 16px; transition: color 0.15s;
-    display: flex; align-items: center;
+  .polaroid:hover .delete-btn,
+  .polaroid:focus-within .delete-btn,
+  .delete-btn:focus-visible{
+    opacity: 1;
+    transform: scale(1);
   }
-  .note-del-btn:hover { color: var(--red); }
-  .note-edit-btn {
-    background: transparent; border: none; color: var(--text3);
-    cursor: pointer; padding: 4px; border-radius: 4px;
-    font-size: 16px; transition: color 0.15s;
-    display: flex; align-items: center;
-  }
-  .note-edit-btn:hover { color: var(--accent); }
+  .delete-btn:hover{ background: #a4502f; }
 
-  /* note colors by range */
-  .np-high { background: rgba(16,185,129,0.15); color: #34d399; }
-  .np-mid { background: rgba(245,158,11,0.15); color: #fbbf24; }
-  .np-low { background: rgba(239,68,68,0.15); color: #f87171; }
+  /* ---------- FOOTER ---------- */
+  footer{
+    background: var(--kraft-dark);
+    text-align:center;
+    padding: 22px 20px;
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+  }
 
-  /* ── MODAL / DIALOG ── */
-  .modal-overlay {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.6);
-    backdrop-filter: blur(4px);
-    z-index: 200;
-    display: none;
-    align-items: center; justify-content: center;
-    padding: 20px;
+  /* ---------- LIGHTBOX ---------- */
+  .lightbox{
+    position: fixed;
+    inset: 0;
+    background: rgba(15,10,6,0.92);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index: 100;
+    padding: 30px;
   }
-  .modal-overlay.visible { display: flex; }
-  .modal {
-    background: var(--surface);
-    border: 0.5px solid var(--border2);
-    border-radius: var(--radius);
-    padding: 24px;
-    width: 100%; max-width: 400px;
-    display: flex; flex-direction: column; gap: 16px;
-  }
-  .modal-title { font-size: 16px; font-weight: 600; }
-  .modal-close {
-    position: absolute; top: 12px; right: 12px;
-    background: transparent; border: none; color: var(--text2);
-    cursor: pointer; font-size: 20px;
-    display: flex; align-items: center;
-  }
-  .form-group { display: flex; flex-direction: column; gap: 6px; }
-  .form-label { font-size: 12px; color: var(--text2); font-weight: 500; }
-  .form-input {
-    background: var(--surface2); border: 0.5px solid var(--border2);
-    color: var(--text); border-radius: var(--radius-xs);
-    padding: 9px 12px; font-size: 14px;
-    transition: border-color 0.15s;
-    width: 100%;
-  }
-  .form-input:focus { outline: none; border-color: var(--accent); }
-  .form-select {
-    background: var(--surface2); border: 0.5px solid var(--border2);
-    color: var(--text); border-radius: var(--radius-xs);
-    padding: 9px 12px; font-size: 14px; width: 100%;
-    appearance: none; cursor: pointer;
-  }
-  .form-select:focus { outline: none; border-color: var(--accent); }
-  .toggle-row { display: flex; gap: 8px; }
-  .toggle-btn {
-    flex: 1; padding: 8px; border-radius: var(--radius-xs);
-    border: 0.5px solid var(--border2); background: var(--surface2);
-    color: var(--text2); font-size: 13px; font-weight: 500;
-    cursor: pointer; transition: all 0.15s;
-  }
-  .toggle-btn.active-lk { background: var(--lk-dim); color: #60a5fa; border-color: rgba(59,130,246,0.3); }
-  .toggle-btn.active-gk { background: var(--gk-dim); color: #9ca3af; border-color: rgba(107,114,128,0.3); }
-  .modal-footer { display: flex; gap: 8px; }
-  .modal-footer .btn-primary { flex: 1; }
-  .modal-footer .btn-ghost { flex: 0 0 auto; width: auto; padding: 10px 16px; }
+  .lightbox.open{ display:flex; }
 
-  /* ── SETUP SCREEN ── */
-  .setup-logo {
-    font-size: 32px; font-weight: 700; letter-spacing: -0.04em;
-    background: linear-gradient(135deg, #7c6ff7, #a78bfa, #c4b5fd);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    margin-bottom: 8px;
+  .lightbox-content{
+    position:relative;
+    max-width: 90vw;
+    max-height: 88vh;
+    background: var(--paper-white);
+    padding: 18px 18px 16px;
+    border-radius: 3px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    text-align:center;
   }
-  .setup-sub { font-size: 14px; color: var(--text2); margin-bottom: 40px; }
-  .setup-card {
-    background: var(--surface); border: 0.5px solid var(--border2);
-    border-radius: var(--radius); padding: 24px; width: 100%;
-    display: flex; flex-direction: column; gap: 20px;
+  .lightbox-content img{
+    display:block;
+    max-width: 100%;
+    max-height: 70vh;
+    object-fit: contain;
   }
-  .setup-label { font-size: 13px; color: var(--text2); margin-bottom: 8px; }
-  .klasse-options { display: flex; gap: 10px; }
-  .klasse-opt {
-    flex: 1; padding: 14px 8px; border-radius: var(--radius-sm);
-    border: 0.5px solid var(--border2); background: var(--surface2);
-    color: var(--text2); font-size: 16px; font-weight: 600;
-    cursor: pointer; text-align: center; transition: all 0.15s;
+  .lightbox-caption{
+    font-family: var(--font-body);
+    font-style: italic;
+    color: var(--ink-soft);
+    margin-top: 12px;
+    font-size: 0.95rem;
+    max-width: 60vw;
   }
-  .klasse-opt:hover { border-color: rgba(124,111,247,0.4); color: var(--text); }
-  .klasse-opt.selected { background: var(--accent-dim); border-color: rgba(124,111,247,0.5); color: #a78bfa; }
-  .id-hint { font-size: 11px; color: var(--text3); text-align: center; margin-top: 8px; }
-  .id-input-row { display: flex; gap: 8px; }
-  .id-input-row .form-input { flex: 1; font-family: monospace; font-size: 13px; }
-  .id-input-row .btn-primary { flex: 0 0 auto; width: auto; padding: 10px 14px; font-size: 13px; }
 
-  /* ── CONFIG MODAL ── */
-  .config-box {
-    background: var(--surface); border: 0.5px solid var(--border2);
-    border-radius: var(--radius); padding: 24px;
-    width: 100%; max-width: 360px;
-    display: flex; flex-direction: column; gap: 16px;
+  .lightbox-close{
+    position:absolute;
+    top: -18px; right: -18px;
+    width: 38px; height:38px;
+    border-radius:50%;
+    background: var(--ink);
+    color: var(--paper-white);
+    border: 2px solid var(--paper-white);
+    font-size: 20px;
+    display:flex; align-items:center; justify-content:center;
   }
-  .config-title { font-size: 16px; font-weight: 600; }
-  .config-id-box {
-    background: var(--surface2); border: 0.5px solid var(--border);
-    border-radius: var(--radius-xs); padding: 10px 12px;
-    font-family: monospace; font-size: 13px; color: var(--text2);
-    word-break: break-all;
-  }
-  .danger-btn {
-    background: var(--red-dim); color: #f87171;
-    border: 0.5px solid rgba(239,68,68,0.25);
-    border-radius: var(--radius-sm); padding: 9px 14px;
-    font-size: 13px; cursor: pointer; width: 100%;
-    transition: all 0.15s;
-  }
-  .danger-btn:hover { background: rgba(239,68,68,0.2); }
+  .lightbox-close:hover{ background: var(--terracotta); }
 
-  /* ── TOAST ── */
-  #toast {
-    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
-    background: var(--surface3); border: 0.5px solid var(--border2);
-    color: var(--text); font-size: 13px; padding: 10px 18px;
-    border-radius: 20px; z-index: 500;
-    transition: transform 0.25s cubic-bezier(.22,1,.36,1);
-    pointer-events: none; white-space: nowrap;
+  .lightbox-nav{
+    position:absolute;
+    top:50%;
+    transform: translateY(-50%);
+    width: 48px; height:48px;
+    border-radius:50%;
+    background: rgba(255,255,255,0.12);
+    border: none;
+    color: var(--paper-white);
+    display:flex; align-items:center; justify-content:center;
+    transition: background .15s ease;
   }
-  #toast.show { transform: translateX(-50%) translateY(0); }
+  .lightbox-nav:hover{ background: rgba(255,255,255,0.28); }
+  .lightbox-nav svg{ width:22px; height:22px; }
+  .lightbox-prev{ left: 4vw; }
+  .lightbox-next{ right: 4vw; }
 
-  /* ── SCROLLBAR ── */
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
-
-  @media (max-width: 480px) {
-    .kurse-grid { grid-template-columns: 1fr; }
-    .note-summary { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  @media (max-width: 600px){
+    header{ padding: 40px 16px 30px; }
+    .upload-zone{ padding: 28px 16px; top: 20px; }
+    .corkboard{ padding: 40px 16px 46px; }
+    .gallery{ grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 38px 18px; }
+    .lightbox-nav{ width: 38px; height:38px; }
+    .lightbox-prev{ left: 2vw; }
+    .lightbox-next{ right: 2vw; }
+    .lightbox-caption{ max-width: 80vw; }
   }
 </style>
 </head>
 <body>
 
-<!-- Loading -->
-<div id="loading-screen">
-  <div class="spinner"></div>
-  <p style="font-size:13px;color:var(--text3)">Daten werden geladen…</p>
-</div>
+<header>
+  <h1>📷 Mein Fotoalbum</h1>
+  <p>Bilder hochladen, anpinnen, durchblättern.</p>
+</header>
 
-<!-- Toast -->
-<div id="toast"></div>
-
-<!-- SETUP SCREEN -->
-<div id="setup-screen">
-  <div style="text-align:center;margin-bottom:40px">
-    <div class="setup-logo">Notenmanager</div>
-    <div class="setup-sub">Noten verwalten, Zeugnis berechnen.</div>
-  </div>
-  <div class="setup-card">
-    <div>
-      <p class="setup-label">Bestehenden Zugang öffnen</p>
-      <div class="id-input-row">
-        <input id="input-existing-id" class="form-input" placeholder="Deine ID eingeben…" autocomplete="off" spellcheck="false">
-        <button class="btn-primary" onclick="loadExistingId()" style="width:auto;padding:10px 14px;font-size:13px">Laden</button>
-      </div>
-      <p class="id-hint">Deine ID findest du im Menü deiner Instanz (oben rechts ⋮)</p>
-    </div>
-    <div style="display:flex;align-items:center;gap:12px">
-      <div style="flex:1;height:0.5px;background:var(--border2)"></div>
-      <span style="font-size:12px;color:var(--text3)">oder neu starten</span>
-      <div style="flex:1;height:0.5px;background:var(--border2)"></div>
-    </div>
-    <div>
-      <p class="setup-label">Welche Klasse bist du?</p>
-      <div class="klasse-options">
-        <button class="klasse-opt" onclick="selectKlasse(11)" id="opt-11">11</button>
-        <button class="klasse-opt" onclick="selectKlasse(12)" id="opt-12">12</button>
-        <button class="klasse-opt" onclick="selectKlasse(13)" id="opt-13">13</button>
-      </div>
-    </div>
-    <button class="btn-primary" onclick="createNew()" id="btn-create" disabled style="opacity:0.4">Neu starten</button>
-  </div>
-</div>
-
-<!-- CONFIG OVERLAY -->
-<div id="config-screen">
-  <div class="config-box">
-    <p class="config-title">Einstellungen</p>
-    <div>
-      <p class="form-label" style="margin-bottom:6px">Deine Datei-ID</p>
-      <div class="config-id-box" id="config-id-display">—</div>
-      <p class="id-hint" style="margin-top:6px">Speichere diese ID, um von einem anderen Gerät auf deine Daten zuzugreifen.</p>
-    </div>
-    <div>
-      <p class="form-label" style="margin-bottom:8px">Klasse wechseln</p>
-      <div class="klasse-options" id="config-klasse-opts">
-        <button class="klasse-opt" onclick="changeKlasse(11)" id="conf-opt-11">11</button>
-        <button class="klasse-opt" onclick="changeKlasse(12)" id="conf-opt-12">12</button>
-        <button class="klasse-opt" onclick="changeKlasse(13)" id="conf-opt-13">13</button>
-      </div>
-    </div>
-    <button class="danger-btn" onclick="resetAll()">⚠ Alle Daten löschen</button>
-    <button class="btn-ghost" onclick="closeConfig()">Schließen</button>
-  </div>
-</div>
-
-<!-- MAIN APP -->
-<div id="app">
-  <!-- Topbar -->
-  <div class="topbar">
-    <div class="topbar-left">
-      <span class="topbar-logo">Notenmanager</span>
-      <span class="klasse-chip" id="topbar-klasse" onclick="openConfig()">Klasse ?</span>
-    </div>
-    <button class="btn-icon" onclick="openConfig()" title="Einstellungen" aria-label="Einstellungen">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-    </button>
+<main>
+  <div class="upload-zone" id="uploadZone" role="button" tabindex="0" aria-label="Bilder hochladen: klicken oder Dateien hier hineinziehen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M4 16l4.586-4.586a2 2 0 0 1 2.828 0L16 16"></path>
+      <path d="M14 14l1.586-1.586a2 2 0 0 1 2.828 0L21 15"></path>
+      <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+      <circle cx="8" cy="9" r="1.6"></circle>
+    </svg>
+    <p class="upload-title">Bilder hierher ziehen</p>
+    <p class="upload-sub">oder klicken, um Dateien auszuwählen — JPG, PNG, GIF, beliebig viele</p>
+    <span class="browse-btn">Dateien auswählen</span>
+    <input type="file" id="fileInput" class="sr-only" accept="image/*" multiple>
   </div>
 
-  <!-- Zeugnis -->
-  <div class="zeugnis-section">
-    <div class="zeugnis-card" id="zeugnis-card">
-      <div>
-        <div class="zeugnis-label">Voraussichtliches Zeugnis</div>
-        <div class="zeugnis-note" id="zeugnis-note">—</div>
-        <div class="zeugnis-sub" id="zeugnis-sub">Noch keine Kurse</div>
-      </div>
-      <div class="zeugnis-right">
-        <div class="zeugnis-schnitt">Ø Punkte: <span id="zeugnis-punkte">—</span></div>
-        <div class="zeugnis-schnitt" style="margin-top:2px">LK-Schnitt: <span id="zeugnis-lk">—</span></div>
-        <div class="zeugnis-schnitt" style="margin-top:2px">GK-Schnitt: <span id="zeugnis-gk">—</span></div>
-      </div>
-    </div>
+  <div class="toolbar" id="toolbar" style="display:none;">
+    <span class="count" id="photoCount"></span>
+    <span class="actions">
+      <button type="button" id="shuffleBtn">Zufällig mischen</button>
+      <button type="button" id="clearBtn" class="clear-btn">Album leeren</button>
+    </span>
   </div>
 
-  <!-- Kurse -->
-  <div class="section">
-    <div class="section-header">
-      <span class="section-title">Kurse</span>
-      <button class="btn-icon" onclick="openKursModal()" title="Kurs hinzufügen" aria-label="Kurs hinzufügen">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      </button>
-    </div>
-    <div class="kurse-grid" id="kurse-grid">
-      <div class="empty-state" style="grid-column:1/-1">
-        <div class="empty-icon">📚</div>
-        <div>Noch keine Kurse. Klicke + um einen Kurs hinzuzufügen.</div>
-      </div>
-    </div>
+  <div class="corkboard">
+    <div class="gallery" id="gallery"></div>
   </div>
-</div>
+</main>
 
-<!-- DETAIL VIEW -->
-<div id="detail-view">
-  <div class="detail-topbar">
-    <button class="back-btn" onclick="closeDetail()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
-      Zurück
-    </button>
-    <span class="detail-title" id="detail-title">Kurs</span>
-    <span class="badge detail-badge" id="detail-badge"></span>
-    <button class="btn-icon" onclick="openDeleteKursConfirm()" title="Kurs löschen" aria-label="Kurs löschen">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-    </button>
-  </div>
+<footer>
+  Hinweis: Die Bilder werden nur lokal in deinem Browser angezeigt — nichts wird hochgeladen oder gespeichert. Nach dem Neuladen der Seite ist das Album wieder leer.
+</footer>
 
-  <!-- Note Summary -->
-  <div class="note-summary" id="note-summary">
-    <div class="note-stat">
-      <div class="note-stat-val" id="stat-schnitt">—</div>
-      <div class="note-stat-label">Ø Punkte</div>
-    </div>
-    <div class="note-stat">
-      <div class="note-stat-val" id="stat-endnote">—</div>
-      <div class="note-stat-label">Endnote</div>
-    </div>
-    <div class="note-stat">
-      <div class="note-stat-val" id="stat-count">0</div>
-      <div class="note-stat-label">Noten</div>
-    </div>
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Foto-Ansicht">
+  <button type="button" class="lightbox-nav lightbox-prev" id="lbPrev" aria-label="Vorheriges Foto">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+  </button>
+  <div class="lightbox-content" id="lightboxContent">
+    <button type="button" class="lightbox-close" id="lbClose" aria-label="Schließen">×</button>
+    <img id="lightboxImg" src="" alt="">
+    <p class="lightbox-caption" id="lightboxCaption"></p>
   </div>
-
-  <!-- Noten Liste -->
-  <div style="padding: 0 20px 12px; display:flex; align-items:center; justify-content:space-between;">
-    <span class="section-title">Noten</span>
-    <button class="btn-icon" onclick="openNoteModal()" title="Note hinzufügen" aria-label="Note hinzufügen">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    </button>
-  </div>
-  <div class="noten-list" id="noten-list"></div>
-</div>
-
-<!-- MODAL: Kurs anlegen -->
-<div class="modal-overlay" id="kurs-modal">
-  <div class="modal">
-    <p class="modal-title" id="kurs-modal-title">Kurs hinzufügen</p>
-    <div class="form-group">
-      <label class="form-label">Fachname</label>
-      <input id="kurs-name-input" class="form-input" placeholder="z.B. Mathematik" maxlength="40">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Kurstyp</label>
-      <div class="toggle-row">
-        <button class="toggle-btn active-lk" id="toggle-lk" onclick="setKursTyp('LK')">Leistungskurs (LK)</button>
-        <button class="toggle-btn" id="toggle-gk" onclick="setKursTyp('GK')">Grundkurs (GK)</button>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-ghost" onclick="closeKursModal()">Abbrechen</button>
-      <button class="btn-primary" onclick="saveKurs()">Speichern</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL: Note eintragen -->
-<div class="modal-overlay" id="note-modal">
-  <div class="modal">
-    <p class="modal-title" id="note-modal-title">Note eintragen</p>
-    <div class="form-group">
-      <label class="form-label">Punkte (0–15)</label>
-      <input id="note-punkte-input" class="form-input" type="number" min="0" max="15" placeholder="z.B. 11">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Art der Leistung</label>
-      <select id="note-art-input" class="form-select">
-        <option value="Klassenarbeit">Klassenarbeit</option>
-        <option value="Klausur">Klausur</option>
-        <option value="Test">Test</option>
-        <option value="Hausaufgabe">Hausaufgabe</option>
-        <option value="Referat">Referat</option>
-        <option value="Mitarbeit">Mitarbeit</option>
-        <option value="Mündliche Note">Mündliche Note</option>
-        <option value="Projektarbeit">Projektarbeit</option>
-        <option value="Sonstige">Sonstige</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Gewichtung</label>
-      <select id="note-gewicht-input" class="form-select">
-        <option value="1">einfach (×1)</option>
-        <option value="2">doppelt (×2)</option>
-        <option value="3">dreifach (×3)</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Datum (optional)</label>
-      <input id="note-datum-input" class="form-input" type="date">
-    </div>
-    <div class="modal-footer">
-      <button class="btn-ghost" onclick="closeNoteModal()">Abbrechen</button>
-      <button class="btn-primary" onclick="saveNote()">Speichern</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL: Confirm delete kurs -->
-<div class="modal-overlay" id="del-kurs-modal">
-  <div class="modal">
-    <p class="modal-title">Kurs löschen?</p>
-    <p style="font-size:13px;color:var(--text2)">Alle Noten in diesem Kurs werden ebenfalls gelöscht. Das kann nicht rückgängig gemacht werden.</p>
-    <div class="modal-footer">
-      <button class="btn-ghost" onclick="closeDelKursModal()">Abbrechen</button>
-      <button class="btn-primary" style="background:var(--red);flex:1" onclick="deleteCurrentKurs()">Löschen</button>
-    </div>
-  </div>
+  <button type="button" class="lightbox-nav lightbox-next" id="lbNext" aria-label="Nächstes Foto">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>
+  </button>
 </div>
 
 <script>
-// ══════════════════════════════════════════
-// FIREBASE CONFIG
-// !! ERSETZE DIES MIT DEINER EIGENEN CONFIG !!
-// ══════════════════════════════════════════
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDEMO_REPLACE_WITH_YOUR_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "000000000000",
-  appId: "1:000000000000:web:0000000000000000"
-};
+(function(){
+  "use strict";
 
-// ══════════════════════════════════════════
-// STATE
-// ══════════════════════════════════════════
-let db;
-let state = {
-  docId: null,
-  klasse: null,
-  kurse: []   // { id, name, typ:'LK'|'GK', noten:[{id,punkte,art,gewicht,datum}] }
-};
-let currentKursId = null;
-let kursTypSelected = 'LK';
-let editingNoteId = null;
+  /** @typedef {{id:string, src:string, caption:string, date:Date, rotation:number, tapeClass:string, tapeRot:number}} Photo */
 
-// ══════════════════════════════════════════
-// FIREBASE INIT
-// ══════════════════════════════════════════
-async function initFirebase() {
-  try {
-    firebase.initializeApp(FIREBASE_CONFIG);
-    db = firebase.firestore();
-    // Anonymous auth so we don't need login
-    await firebase.auth().signInAnonymously();
-    await loadFromStorage();
-  } catch(e) {
-    console.error('Firebase error:', e);
-    // Fallback: use localStorage with a warning
-    showToast('⚠ Offline-Modus – Daten nur lokal');
-    db = null;
-    await loadFromStorage();
+  /** @type {Photo[]} */
+  let photos = [];
+  let lightboxIndex = -1;
+
+  const uploadZone   = document.getElementById('uploadZone');
+  const fileInput    = document.getElementById('fileInput');
+  const gallery      = document.getElementById('gallery');
+  const toolbar      = document.getElementById('toolbar');
+  const photoCount   = document.getElementById('photoCount');
+  const shuffleBtn   = document.getElementById('shuffleBtn');
+  const clearBtn     = document.getElementById('clearBtn');
+
+  const lightbox        = document.getElementById('lightbox');
+  const lightboxImg     = document.getElementById('lightboxImg');
+  const lightboxCaption = document.getElementById('lightboxCaption');
+  const lbClose         = document.getElementById('lbClose');
+  const lbPrev           = document.getElementById('lbPrev');
+  const lbNext           = document.getElementById('lbNext');
+
+  const TAPE_CLASSES = ['tape-terracotta','tape-sage','tape-mustard','tape-blue'];
+
+  function pad(n){ return n < 10 ? '0' + n : String(n); }
+
+  function formatDate(d){
+    return pad(d.getDate()) + '.' + pad(d.getMonth()+1) + '.' + d.getFullYear();
   }
-}
 
-// ══════════════════════════════════════════
-// STORAGE
-// ══════════════════════════════════════════
-async function loadFromStorage() {
-  hideLoading();
-  const savedId = localStorage.getItem('notenmanager_docid');
-  if (savedId) {
-    state.docId = savedId;
-    await fetchData();
-  } else {
-    showSetup();
+  function escapeHtml(str){
+    return str
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
   }
-}
 
-async function fetchData() {
-  if (!db) {
-    // fallback localStorage
-    const local = localStorage.getItem('notenmanager_data');
-    if (local) {
-      const d = JSON.parse(local);
-      state.klasse = d.klasse;
-      state.kurse = d.kurse || [];
-    }
-    showApp();
-    return;
+  function makeId(){
+    return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
   }
-  try {
-    const doc = await db.collection('notenmanager').doc(state.docId).get();
-    if (doc.exists) {
-      const d = doc.data();
-      state.klasse = d.klasse;
-      state.kurse = d.kurse || [];
-      showApp();
-    } else {
-      localStorage.removeItem('notenmanager_docid');
-      state.docId = null;
-      showSetup();
-    }
-  } catch(e) {
-    showToast('Fehler beim Laden');
-    showSetup();
+
+  // ---------- Upload handling ----------
+
+  function handleFiles(fileList){
+    const files = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = function(e){
+        addPhoto(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    });
   }
-}
 
-async function saveData() {
-  const payload = { klasse: state.klasse, kurse: state.kurse, updatedAt: new Date().toISOString() };
-  // Always backup to localStorage
-  localStorage.setItem('notenmanager_data', JSON.stringify(payload));
-  if (!db || !state.docId) return;
-  try {
-    await db.collection('notenmanager').doc(state.docId).set(payload);
-  } catch(e) {
-    showToast('⚠ Speichern fehlgeschlagen');
+  function addPhoto(src){
+    const photo = {
+      id: makeId(),
+      src: src,
+      caption: '',
+      date: new Date(),
+      rotation: (Math.random() * 7 - 3.5),
+      tapeClass: TAPE_CLASSES[Math.floor(Math.random() * TAPE_CLASSES.length)],
+      tapeRot: (Math.random() * 10 - 5)
+    };
+    photos.push(photo);
+    renderGallery();
   }
-}
 
-// ══════════════════════════════════════════
-// SETUP
-// ══════════════════════════════════════════
-let selectedKlasse = null;
-
-function selectKlasse(k) {
-  selectedKlasse = k;
-  [11,12,13].forEach(n => {
-    document.getElementById('opt-'+n).classList.toggle('selected', n === k);
-  });
-  const btn = document.getElementById('btn-create');
-  btn.disabled = false;
-  btn.style.opacity = '1';
-}
-
-async function createNew() {
-  if (!selectedKlasse) return;
-  const id = 'nm_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
-  state.docId = id;
-  state.klasse = selectedKlasse;
-  state.kurse = [];
-  localStorage.setItem('notenmanager_docid', id);
-  await saveData();
-  showApp();
-}
-
-async function loadExistingId() {
-  const val = document.getElementById('input-existing-id').value.trim();
-  if (!val) { showToast('Bitte ID eingeben'); return; }
-  state.docId = val;
-  localStorage.setItem('notenmanager_docid', val);
-  showLoading();
-  await fetchData();
-}
-
-// ══════════════════════════════════════════
-// CONFIG
-// ══════════════════════════════════════════
-function openConfig() {
-  document.getElementById('config-id-display').textContent = state.docId || '—';
-  [11,12,13].forEach(n => {
-    document.getElementById('conf-opt-'+n).classList.toggle('selected', n === state.klasse);
-  });
-  document.getElementById('config-screen').classList.add('visible');
-}
-function closeConfig() {
-  document.getElementById('config-screen').classList.remove('visible');
-}
-async function changeKlasse(k) {
-  state.klasse = k;
-  [11,12,13].forEach(n => {
-    document.getElementById('conf-opt-'+n).classList.toggle('selected', n === k);
-  });
-  await saveData();
-  renderApp();
-  showToast('Klasse geändert');
-}
-async function resetAll() {
-  if (!confirm('Wirklich ALLE Daten löschen?')) return;
-  if (db && state.docId) {
-    try { await db.collection('notenmanager').doc(state.docId).delete(); } catch(e) {}
-  }
-  localStorage.removeItem('notenmanager_docid');
-  localStorage.removeItem('notenmanager_data');
-  state = { docId: null, klasse: null, kurse: [] };
-  closeConfig();
-  showSetup();
-}
-
-// ══════════════════════════════════════════
-// SCREENS
-// ══════════════════════════════════════════
-function showLoading() { document.getElementById('loading-screen').classList.remove('hidden'); }
-function hideLoading() { document.getElementById('loading-screen').classList.add('hidden'); }
-function showSetup() {
-  hideLoading();
-  document.getElementById('setup-screen').classList.add('visible');
-  document.getElementById('app').classList.remove('visible');
-  document.getElementById('detail-view').classList.remove('visible');
-}
-function showApp() {
-  hideLoading();
-  document.getElementById('setup-screen').classList.remove('visible');
-  document.getElementById('app').classList.add('visible');
-  document.getElementById('detail-view').classList.remove('visible');
-  renderApp();
-}
-function showDetail(kursId) {
-  currentKursId = kursId;
-  document.getElementById('app').classList.remove('visible');
-  document.getElementById('detail-view').classList.add('visible');
-  renderDetail();
-}
-function closeDetail() {
-  currentKursId = null;
-  showApp();
-}
-
-// ══════════════════════════════════════════
-// RENDER
-// ══════════════════════════════════════════
-function renderApp() {
-  document.getElementById('topbar-klasse').textContent = 'Klasse ' + state.klasse;
-  renderZeugnis();
-  renderKurse();
-}
-
-function renderZeugnis() {
-  const kurse = state.kurse;
-  const allPunkte = [];
-  const lkPunkte = []; const gkPunkte = [];
-
-  kurse.forEach(k => {
-    const avg = kursSchnitt(k);
-    if (avg !== null) {
-      allPunkte.push(avg);
-      if (k.typ === 'LK') lkPunkte.push(avg); else gkPunkte.push(avg);
+  uploadZone.addEventListener('click', () => fileInput.click());
+  uploadZone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' '){
+      e.preventDefault();
+      fileInput.click();
     }
   });
 
-  const setEl = (id, v) => document.getElementById(id).textContent = v;
+  fileInput.addEventListener('change', function(){
+    handleFiles(this.files);
+    this.value = '';
+  });
 
-  if (allPunkte.length === 0) {
-    setEl('zeugnis-note', '—');
-    setEl('zeugnis-sub', 'Noch keine benoteten Kurse');
-    setEl('zeugnis-punkte', '—');
-    setEl('zeugnis-lk', '—');
-    setEl('zeugnis-gk', '—');
-    return;
+  ['dragenter','dragover'].forEach(evt => {
+    uploadZone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      uploadZone.classList.add('dragover');
+    });
+  });
+  ['dragleave','dragend'].forEach(evt => {
+    uploadZone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      uploadZone.classList.remove('dragover');
+    });
+  });
+  uploadZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    uploadZone.classList.remove('dragover');
+    if (e.dataTransfer && e.dataTransfer.files){
+      handleFiles(e.dataTransfer.files);
+    }
+  });
+
+  // Prevent the whole page from navigating away if an image is dropped outside the zone
+  ['dragover','drop'].forEach(evt => {
+    document.addEventListener(evt, (e) => e.preventDefault());
+  });
+
+  // ---------- Rendering ----------
+
+  function renderGallery(){
+    updateToolbar();
+
+    if (photos.length === 0){
+      gallery.classList.add('gallery--empty');
+      gallery.innerHTML = emptyStateHtml();
+      return;
+    }
+
+    gallery.classList.remove('gallery--empty');
+    gallery.innerHTML = photos.map(photoToHtml).join('');
   }
 
-  const avg = allPunkte.reduce((a,b)=>a+b,0)/allPunkte.length;
-  setEl('zeugnis-note', punkteZuNote(avg));
-  setEl('zeugnis-sub', allPunkte.length + ' Kurs' + (allPunkte.length===1?'':'e') + ' bewertet');
-  setEl('zeugnis-punkte', avg.toFixed(1));
-  setEl('zeugnis-lk', lkPunkte.length ? (lkPunkte.reduce((a,b)=>a+b,0)/lkPunkte.length).toFixed(1) : '—');
-  setEl('zeugnis-gk', gkPunkte.length ? (gkPunkte.reduce((a,b)=>a+b,0)/gkPunkte.length).toFixed(1) : '—');
-}
-
-function renderKurse() {
-  const grid = document.getElementById('kurse-grid');
-  if (state.kurse.length === 0) {
-    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">📚</div><div>Noch keine Kurse. Klicke + um einen Kurs hinzuzufügen.</div></div>';
-    return;
-  }
-  grid.innerHTML = state.kurse.map(k => {
-    const avg = kursSchnitt(k);
-    const noteStr = avg !== null ? String(Math.round(avg)).padStart(2,'0') : '—';
-    const count = k.noten.length;
-    return `<div class="kurs-card" onclick="showDetail('${k.id}')">
-      <div class="kurs-name">${esc(k.name)}</div>
-      <div class="kurs-footer">
-        <span class="badge badge-${k.typ.toLowerCase()}">${k.typ}</span>
-        <span class="kurs-count">${count} Note${count!==1?'n':''}</span>
-        <span class="kurs-note-big">${noteStr}</span>
+  function emptyStateHtml(){
+    return `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+          <circle cx="9" cy="11" r="2"></circle>
+          <path d="M21 16l-5-4-4 3-3-2-6 5"></path>
+        </svg>
+        <h2>Noch leer hier …</h2>
+        <p>Lade dein erstes Foto hoch und dein Album erwacht zum Leben.</p>
       </div>
-    </div>`;
-  }).join('');
-}
-
-function renderDetail() {
-  const kurs = state.kurse.find(k => k.id === currentKursId);
-  if (!kurs) { closeDetail(); return; }
-
-  document.getElementById('detail-title').textContent = kurs.name;
-  const badge = document.getElementById('detail-badge');
-  badge.textContent = kurs.typ;
-  badge.className = 'badge detail-badge badge-' + kurs.typ.toLowerCase();
-
-  const avg = kursSchnitt(kurs);
-  document.getElementById('stat-schnitt').textContent = avg !== null ? avg.toFixed(1) : '—';
-  document.getElementById('stat-endnote').textContent = avg !== null ? punkteZuNote(avg) : '—';
-  document.getElementById('stat-count').textContent = kurs.noten.length;
-
-  const list = document.getElementById('noten-list');
-  if (kurs.noten.length === 0) {
-    list.innerHTML = '<div class="empty-state"><div class="empty-icon">✏️</div><div>Noch keine Noten. Klicke + um eine Note hinzuzufügen.</div></div>';
-    return;
+    `;
   }
 
-  list.innerHTML = [...kurs.noten].reverse().map(n => {
-    const cls = n.punkte >= 10 ? 'np-high' : n.punkte >= 5 ? 'np-mid' : 'np-low';
-    const gwLabel = n.gewicht > 1 ? ` · ×${n.gewicht}` : '';
-    const datStr = n.datum ? new Date(n.datum).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '';
-    return `<div class="note-item">
-      <div class="note-punkt-circle ${cls}">${n.punkte}</div>
-      <div class="note-info">
-        <div class="note-art">${esc(n.art)}</div>
-        <div class="note-datum">${datStr ? datStr + gwLabel : gwLabel.replace(' · ','') || '—'}</div>
+  function photoToHtml(photo, index){
+    const captionEsc = escapeHtml(photo.caption || '');
+    return `
+      <div class="polaroid" style="--rot:${photo.rotation}deg" data-id="${photo.id}">
+        <span class="tape ${photo.tapeClass}" style="--tape-rot:${photo.tapeRot}deg"></span>
+        <button type="button" class="delete-btn" data-action="delete" data-id="${photo.id}" aria-label="Foto löschen">×</button>
+        <div class="photo-frame" data-action="open" data-index="${index}">
+          <img src="${photo.src}" alt="${captionEsc ? captionEsc : 'Hochgeladenes Foto'}">
+          <span class="stamp">${formatDate(photo.date)}</span>
+        </div>
+        <div class="caption" contenteditable="true" data-id="${photo.id}" data-placeholder="Schreib eine Notiz dazu …" aria-label="Bildbeschreibung bearbeiten">${captionEsc}</div>
       </div>
-      <div class="note-actions">
-        <button class="note-edit-btn" onclick="openEditNote('${n.id}')" title="Bearbeiten">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        </button>
-        <button class="note-del-btn" onclick="deleteNote('${n.id}')" title="Löschen">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-        </button>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-// ══════════════════════════════════════════
-// KURS MODAL
-// ══════════════════════════════════════════
-let editingKursId = null;
-
-function openKursModal() {
-  editingKursId = null;
-  document.getElementById('kurs-modal-title').textContent = 'Kurs hinzufügen';
-  document.getElementById('kurs-name-input').value = '';
-  kursTypSelected = 'LK';
-  updateKursToggle();
-  document.getElementById('kurs-modal').classList.add('visible');
-  setTimeout(()=>document.getElementById('kurs-name-input').focus(), 50);
-}
-
-function closeKursModal() {
-  document.getElementById('kurs-modal').classList.remove('visible');
-}
-
-function setKursTyp(t) {
-  kursTypSelected = t;
-  updateKursToggle();
-}
-function updateKursToggle() {
-  document.getElementById('toggle-lk').className = 'toggle-btn' + (kursTypSelected==='LK' ? ' active-lk' : '');
-  document.getElementById('toggle-gk').className = 'toggle-btn' + (kursTypSelected==='GK' ? ' active-gk' : '');
-}
-
-async function saveKurs() {
-  const name = document.getElementById('kurs-name-input').value.trim();
-  if (!name) { showToast('Bitte Fachname eingeben'); return; }
-
-  if (editingKursId) {
-    const k = state.kurse.find(k=>k.id===editingKursId);
-    if (k) { k.name = name; k.typ = kursTypSelected; }
-  } else {
-    state.kurse.push({ id: uid(), name, typ: kursTypSelected, noten: [] });
-  }
-  await saveData();
-  renderApp();
-  closeKursModal();
-  showToast(editingKursId ? 'Kurs gespeichert' : 'Kurs hinzugefügt ✓');
-}
-
-// ══════════════════════════════════════════
-// NOTE MODAL
-// ══════════════════════════════════════════
-function openNoteModal() {
-  editingNoteId = null;
-  document.getElementById('note-modal-title').textContent = 'Note eintragen';
-  document.getElementById('note-punkte-input').value = '';
-  document.getElementById('note-art-input').value = 'Klausur';
-  document.getElementById('note-gewicht-input').value = '1';
-  document.getElementById('note-datum-input').value = new Date().toISOString().slice(0,10);
-  document.getElementById('note-modal').classList.add('visible');
-  setTimeout(()=>document.getElementById('note-punkte-input').focus(), 50);
-}
-
-function openEditNote(noteId) {
-  const kurs = state.kurse.find(k=>k.id===currentKursId);
-  const note = kurs && kurs.noten.find(n=>n.id===noteId);
-  if (!note) return;
-  editingNoteId = noteId;
-  document.getElementById('note-modal-title').textContent = 'Note bearbeiten';
-  document.getElementById('note-punkte-input').value = note.punkte;
-  document.getElementById('note-art-input').value = note.art;
-  document.getElementById('note-gewicht-input').value = note.gewicht;
-  document.getElementById('note-datum-input').value = note.datum || '';
-  document.getElementById('note-modal').classList.add('visible');
-}
-
-function closeNoteModal() {
-  document.getElementById('note-modal').classList.remove('visible');
-}
-
-async function saveNote() {
-  const p = parseInt(document.getElementById('note-punkte-input').value);
-  if (isNaN(p) || p < 0 || p > 15) { showToast('Punkte müssen zwischen 0 und 15 liegen'); return; }
-  const art = document.getElementById('note-art-input').value;
-  const gewicht = parseInt(document.getElementById('note-gewicht-input').value);
-  const datum = document.getElementById('note-datum-input').value;
-
-  const kurs = state.kurse.find(k=>k.id===currentKursId);
-  if (!kurs) return;
-
-  if (editingNoteId) {
-    const note = kurs.noten.find(n=>n.id===editingNoteId);
-    if (note) { note.punkte=p; note.art=art; note.gewicht=gewicht; note.datum=datum; }
-  } else {
-    kurs.noten.push({ id: uid(), punkte: p, art, gewicht, datum });
+    `;
   }
 
-  await saveData();
-  renderDetail();
-  renderZeugnis();
-  closeNoteModal();
-  showToast(editingNoteId ? 'Note aktualisiert ✓' : 'Note gespeichert ✓');
-}
+  function updateToolbar(){
+    if (photos.length === 0){
+      toolbar.style.display = 'none';
+      return;
+    }
+    toolbar.style.display = 'flex';
+    photoCount.textContent = photos.length === 1
+      ? '1 Foto im Album'
+      : photos.length + ' Fotos im Album';
+  }
 
-async function deleteNote(noteId) {
-  const kurs = state.kurse.find(k=>k.id===currentKursId);
-  if (!kurs) return;
-  kurs.noten = kurs.noten.filter(n=>n.id!==noteId);
-  await saveData();
-  renderDetail();
-  renderZeugnis();
-  showToast('Note gelöscht');
-}
+  // ---------- Gallery interactions (delegated) ----------
 
-// ══════════════════════════════════════════
-// DELETE KURS
-// ══════════════════════════════════════════
-function openDeleteKursConfirm() {
-  document.getElementById('del-kurs-modal').classList.add('visible');
-}
-function closeDelKursModal() {
-  document.getElementById('del-kurs-modal').classList.remove('visible');
-}
-async function deleteCurrentKurs() {
-  state.kurse = state.kurse.filter(k=>k.id!==currentKursId);
-  await saveData();
-  closeDelKursModal();
-  closeDetail();
-  showToast('Kurs gelöscht');
-}
+  gallery.addEventListener('click', (e) => {
+    const delBtn = e.target.closest('[data-action="delete"]');
+    if (delBtn){
+      deletePhoto(delBtn.dataset.id);
+      return;
+    }
+    const frame = e.target.closest('[data-action="open"]');
+    if (frame){
+      openLightbox(parseInt(frame.dataset.index, 10));
+    }
+  });
 
-// ══════════════════════════════════════════
-// HELPERS
-// ══════════════════════════════════════════
-function kursSchnitt(kurs) {
-  if (!kurs.noten.length) return null;
-  let sum = 0, total = 0;
-  kurs.noten.forEach(n => { sum += n.punkte * n.gewicht; total += n.gewicht; });
-  return total ? sum / total : null;
-}
+  gallery.addEventListener('blur', (e) => {
+    if (e.target.classList && e.target.classList.contains('caption')){
+      const text = e.target.innerText.trim();
+      if (text === ''){
+        e.target.innerHTML = '';
+      }
+      const photo = photos.find(p => p.id === e.target.dataset.id);
+      if (photo) photo.caption = text;
+    }
+  }, true);
 
-function punkteZuNote(p) {
-  if (p >= 13.5) return '1+';
-  if (p >= 12.5) return '1';
-  if (p >= 11.5) return '1–';
-  if (p >= 10.5) return '2+';
-  if (p >= 9.5)  return '2';
-  if (p >= 8.5)  return '2–';
-  if (p >= 7.5)  return '3+';
-  if (p >= 6.5)  return '3';
-  if (p >= 5.5)  return '3–';
-  if (p >= 4.5)  return '4+';
-  if (p >= 3.5)  return '4';
-  if (p >= 2.5)  return '4–';
-  if (p >= 1.5)  return '5+';
-  if (p >= 0.5)  return '5';
-  return '6';
-}
+  function deletePhoto(id){
+    photos = photos.filter(p => p.id !== id);
+    renderGallery();
+  }
 
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
-function esc(s) { return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  shuffleBtn.addEventListener('click', () => {
+    for (let i = photos.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [photos[i], photos[j]] = [photos[j], photos[i]];
+    }
+    renderGallery();
+  });
 
-let toastTimer;
-function showToast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>el.classList.remove('show'), 2200);
-}
+  clearBtn.addEventListener('click', () => {
+    if (photos.length === 0) return;
+    if (confirm('Wirklich alle Fotos aus dem Album entfernen?')){
+      photos = [];
+      renderGallery();
+    }
+  });
 
-// keyboard: Enter in inputs
-document.getElementById('kurs-name-input').addEventListener('keydown', e=>{ if(e.key==='Enter') saveKurs(); });
-document.getElementById('note-punkte-input').addEventListener('keydown', e=>{ if(e.key==='Enter') saveNote(); });
+  // ---------- Lightbox ----------
 
-// close modals on overlay click
-['kurs-modal','note-modal','del-kurs-modal'].forEach(id=>{
-  document.getElementById(id).addEventListener('click', e=>{ if(e.target===e.currentTarget) e.currentTarget.classList.remove('visible'); });
-});
-document.getElementById('config-screen').addEventListener('click', e=>{ if(e.target===e.currentTarget) closeConfig(); });
+  function openLightbox(index){
+    lightboxIndex = index;
+    updateLightbox();
+    lightbox.classList.add('open');
+  }
 
-// ══════════════════════════════════════════
-// BOOT
-// ══════════════════════════════════════════
-initFirebase();
+  function closeLightbox(){
+    lightbox.classList.remove('open');
+    lightboxIndex = -1;
+  }
+
+  function updateLightbox(){
+    const photo = photos[lightboxIndex];
+    if (!photo) return;
+    lightboxImg.src = photo.src;
+    lightboxImg.alt = photo.caption || 'Foto';
+    lightboxCaption.textContent = photo.caption || '';
+  }
+
+  function showPrev(){
+    if (photos.length === 0) return;
+    lightboxIndex = (lightboxIndex - 1 + photos.length) % photos.length;
+    updateLightbox();
+  }
+  function showNext(){
+    if (photos.length === 0) return;
+    lightboxIndex = (lightboxIndex + 1) % photos.length;
+    updateLightbox();
+  }
+
+  lbClose.addEventListener('click', closeLightbox);
+  lbPrev.addEventListener('click', showPrev);
+  lbNext.addEventListener('click', showNext);
+
+  lightbox.addEventListener('click', (e) => {
+    if (e.target === lightbox){
+      closeLightbox();
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (!lightbox.classList.contains('open')) return;
+    if (e.key === 'Escape') closeLightbox();
+    if (e.key === 'ArrowLeft') showPrev();
+    if (e.key === 'ArrowRight') showNext();
+  });
+
+  // ---------- Initial render ----------
+  renderGallery();
+
+})();
 </script>
+
 </body>
 </html>
